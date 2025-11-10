@@ -7,6 +7,7 @@ const PostulacionModel = {
     id: "id",
     candidato: "candidato",
     vacante: "vacante",
+    informacion: "informacion", // 👈 nuevo campo agregado
     fecha_postulacion: "fecha_postulacion",
     estado: "estado",
   },

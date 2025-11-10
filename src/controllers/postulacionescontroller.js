@@ -4,8 +4,7 @@ const { PostulacionModel } = require("../models/postulaciones.js");
 // 🧩 Crear una nueva postulación
 exports.createPostulacion = async (req, res, next) => {
   try {
-    const { vacante } = req.body;
-    const candidato = req.user.identificacion; // 👈 asumimos que el JWT trae este campo
+    const { vacante, informacion } = req.body;
 
     if (!vacante) {
       return res.status(400).json({
@@ -14,12 +13,42 @@ exports.createPostulacion = async (req, res, next) => {
       });
     }
 
-    // Verificar si ya existe una postulación del mismo candidato a la misma vacante
+    // 👇 Intentamos obtener el correo desde el token o desde el body
+    const correo =
+      req.user?.email ||
+      informacion?.correo ||
+      informacion?.email;
+
+    if (!correo) {
+      return res.status(400).json({
+        success: false,
+        message: "No se pudo obtener el correo del usuario autenticado",
+      });
+    }
+
+    // 🧠 Buscar el ID real del usuario en la tabla "usuarios"
+    const { data: userData, error: userError } = await supabase
+      .from("usuario")
+      .select("identificacion")
+      .eq("email", correo)
+      .maybeSingle();
+
+    if (userError || !userData) {
+      return res.status(404).json({
+        success: false,
+        message: "No se encontró el usuario en la base de datos",
+      });
+    }
+
+    const candidatoId = userData.identificacion;
+    const vacanteId = Number(vacante);
+
+    // 🕵️ Verificar si ya existe postulación del mismo candidato
     const { data: existing, error: existErr } = await supabase
       .from(PostulacionModel.table)
       .select("*")
-      .eq("candidato", candidato)
-      .eq("vacante", vacante)
+      .eq("candidato", candidatoId)
+      .eq("vacante", vacanteId)
       .maybeSingle();
 
     if (existErr) throw existErr;
@@ -30,10 +59,18 @@ exports.createPostulacion = async (req, res, next) => {
       });
     }
 
-    // Crear nueva postulación
+    // 📝 Crear nueva postulación
     const { data, error } = await supabase
       .from(PostulacionModel.table)
-      .insert([{ candidato, vacante }])
+      .insert([
+        {
+          candidato: candidatoId,
+          vacante: vacanteId,
+          informacion,
+          fecha_postulacion: new Date().toISOString(),
+          estado: "En revisión",
+        },
+      ])
       .select("*")
       .single();
 
@@ -45,20 +82,44 @@ exports.createPostulacion = async (req, res, next) => {
       data,
     });
   } catch (err) {
+    console.error("❌ Error al crear postulación:", err);
     next(err);
   }
 };
 
+
 // 📋 Obtener todas las postulaciones del usuario autenticado
 exports.getPostulacionesByUser = async (req, res, next) => {
   try {
-    const candidato = req.user.identificacion;
+    const { email } = req.query; // 👈 viene del front
 
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "El correo del usuario es obligatorio",
+      });
+    }
+
+    // 🔍 Buscar el usuario por correo
+    const { data: userData, error: userError } = await supabase
+      .from("usuario")
+      .select("identificacion")
+      .eq("email", email)
+      .maybeSingle();
+
+    if (userError || !userData) {
+      return res.status(404).json({
+        success: false,
+        message: "No se encontró el usuario en la base de datos",
+      });
+    }
+
+    const candidato = userData.identificacion;
+
+    // 📋 Obtener postulaciones del candidato
     const { data, error } = await supabase
       .from(PostulacionModel.table)
-      .select(
-        `id, vacante:vacante(*), fecha_postulacion, estado`
-      )
+      .select(`id, vacante:vacante(*), fecha_postulacion, estado`)
       .eq("candidato", candidato)
       .order("fecha_postulacion", { ascending: false });
 
@@ -66,13 +127,52 @@ exports.getPostulacionesByUser = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: "Postulaciones del usuario obtenidas correctamente",
+      message: "Postulaciones obtenidas correctamente",
       data,
     });
   } catch (err) {
+    console.error("❌ Error al obtener postulaciones:", err);
     next(err);
   }
 };
+
+// Obtener los postulados de una vacante
+exports.getPostuladosByVacante = async (req, res, next) => {
+  try {
+    const { vacanteId } = req.params;
+
+    const { data, error } = await supabase
+      .from("postulaciones")
+      .select("informacion")
+      .eq("vacante", vacanteId);
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No hay postulados para esta vacante",
+      });
+    }
+
+    // información está guardada como JSON en la DB
+    const postulados = data.map((p) => JSON.parse(p.informacion));
+
+    res.status(200).json({
+      success: true,
+      message: "Postulados obtenidos correctamente",
+      data: postulados,
+    });
+  } catch (err) {
+    console.error("❌ Error al obtener postulados:", err);
+    res.status(500).json({
+      success: false,
+      message: "Error al obtener los postulados",
+    });
+  }
+};
+
+
 
 // 🔍 Obtener una postulación específica
 exports.getPostulacionById = async (req, res, next) => {

@@ -2,6 +2,7 @@ const express = require("express");
 const {
   createPostulacion,
   getPostulacionesByUser,
+  getPostuladosByVacante,
   getPostulacionById,
   updatePostulacion,
   deletePostulacion,
@@ -20,7 +21,10 @@ const router = express.Router();
 router.post("/", auth, createPostulacion);
 
 // ✅ Ver postulaciones del usuario autenticado
-router.get("/", auth, getPostulacionesByUser);
+router.get("/", getPostulacionesByUser);
+
+// postulados por vacante
+router.get("/vacante/:vacanteId", getPostuladosByVacante);
 
 // ✅ Ver detalle de una postulación específica
 router.get("/:id", auth, getPostulacionById);
