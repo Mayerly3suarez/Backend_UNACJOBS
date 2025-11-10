@@ -8,7 +8,13 @@ const dashboardRoutes = require("./src/routes/dashboardRoutes");
 const errorHandler = require("./src/middlewares/errorHandler");
 
 const app = express();
-app.use(cors());
+app.use(
+  cors({
+    origin: "http://localhost:5173", // dominio del frontend Vite
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 // Rutas API

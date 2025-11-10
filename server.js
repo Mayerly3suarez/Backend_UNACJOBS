@@ -10,12 +10,13 @@ const PORT = process.env.PORT || 5500;
 const HOST = process.env.HOST || "0.0.0.0"; // Permite acceder desde otras máquinas en la red
 
 // 🌍 Middlewares globales
-app.use(cors({
-  origin: true, // Permite cualquier origen (útil para desarrollo)
-  credentials: true, // Permite cookies y autenticación
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.use(
+  cors({
+    origin: "http://localhost:5173", // dominio del frontend Vite
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 // ✅ Rutas principales de la API
